@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Snake Game</title>
+    <style>
+        .container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: #f0f0f0;
+        }
+        .grid-cell {
+            rx: 5;
+            ry: 5;
+            stroke: none;
+        }
+        .grid-light {
+            fill: #90EE90;
+        }
+        .grid-dark {
+            fill: #32CD32;
+        }
+        .snake-cell {
+            fill: #FFB266;
+            rx: 5;
+            ry: 5;
+            transition: all 0.2s ease;
+        }
+        .snake-head {
+            fill: #FF8000;
+        }
+        .snake-eye {
+            fill: black;
+            rx: 2;
+            ry: 2;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <svg id="gameBoard" width="600" height="400" viewBox="0 0 600 400">
+        <rect width="600" height="400" fill="#32CD32"/>
+        <g id="grid"></g>
+        <g id="snake"></g>
+        <g id="eyes"></g>
+    </svg>
+</div>
+
+<script>
+const gridSize = 20;
+const boardWidth = 600;
+const boardHeight = 400;
+const svg = document.getElementById('gameBoard');
+const gridGroup = document.getElementById('grid');
+const snakeGroup = document.getElementById('snake');
+const eyesGroup = document.getElementById('eyes');
+
+// Crear cuadrícula sin espacios
+const gridCells = {};
+for (let x = 0; x < boardWidth; x += gridSize) {
+    for (let y = 0; y < boardHeight; y += gridSize) {
+        if ((x/gridSize + y/gridSize) % 2 === 0) {
+            const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            rect.setAttribute("x", x);
+            rect.setAttribute("y", y);
+            rect.setAttribute("width", gridSize);
+            rect.setAttribute("height", gridSize);
+            rect.setAttribute("class", "grid-cell grid-light");
+            gridGroup.appendChild(rect);
+            gridCells[`${x},${y}`] = rect;
+        } else {
+            gridCells[`${x},${y}`] = null;
+        }
+    }
+}
+
+// Inicializar serpiente
+let snake = [
+    {x: 300, y: 200},
+    {x: 280, y: 200},
+    {x: 260, y: 200},
+    {x: 240, y: 200},
+    {x: 220, y: 200},
+    {x: 200, y: 200}
+];
+let direction = {x: gridSize, y: 0};
+let nextDirection = {x: gridSize, y: 0};
+let previousPositions = new Set();
+
+function updateSnake() {
+    // Limpiar posiciones anteriores
+    previousPositions.forEach(pos => {
+        const [x, y] = pos.split(',').map(Number);
+        const cell = gridCells[`${x},${y}`];
+        if (cell) {
+            cell.setAttribute("class", "grid-cell grid-light");
+        } else {
+            const existingSnakeCell = document.querySelector(`rect[data-pos="${x},${y}"]`);
+            if (existingSnakeCell) {
+                existingSnakeCell.remove();
+            }
+        }
+    });
+    previousPositions.clear();
+    
+    // Limpiar ojos anteriores
+    while (eyesGroup.firstChild) {
+        eyesGroup.removeChild(eyesGroup.firstChild);
+    }
+    
+    // Marcar nuevas posiciones
+    snake.forEach((segment, index) => {
+        const key = `${segment.x},${segment.y}`;
+        const cell = gridCells[key];
+        
+        if (cell) {
+            cell.setAttribute("class", `grid-cell ${index === 0 ? 'snake-head' : 'snake-cell'}`);
+        } else {
+            const snakeRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            snakeRect.setAttribute("x", segment.x);
+            snakeRect.setAttribute("y", segment.y);
+            snakeRect.setAttribute("width", gridSize);
+            snakeRect.setAttribute("height", gridSize);
+            snakeRect.setAttribute("class", `grid-cell ${index === 0 ? 'snake-head' : 'snake-cell'}`);
+            snakeRect.setAttribute("data-pos", key);
+            snakeGroup.appendChild(snakeRect);
+        }
+        previousPositions.add(key);
+        
+        // Añadir ojos si es la cabeza
+        if (index === 0) {
+            // Calcular posición de los ojos según la dirección
+            const eyeOffset = 5;
+            const eyeSize = 4;
+            let leftEyeX, leftEyeY, rightEyeX, rightEyeY;
+            
+            if (direction.x > 0) { // Moviendo a la derecha
+                leftEyeX = segment.x + gridSize - eyeOffset - eyeSize;
+                rightEyeX = leftEyeX;
+                leftEyeY = segment.y + eyeOffset;
+                rightEyeY = segment.y + gridSize - eyeOffset - eyeSize;
+            } else if (direction.x < 0) { // Moviendo a la izquierda
+                leftEyeX = segment.x + eyeOffset;
+                rightEyeX = leftEyeX;
+                leftEyeY = segment.y + eyeOffset;
+                rightEyeY = segment.y + gridSize - eyeOffset - eyeSize;
+            } else if (direction.y > 0) { // Moviendo hacia abajo
+                leftEyeX = segment.x + eyeOffset;
+                rightEyeX = segment.x + gridSize - eyeOffset - eyeSize;
+                leftEyeY = segment.y + gridSize - eyeOffset - eyeSize;
+                rightEyeY = leftEyeY;
+            } else { // Moviendo hacia arriba
+                leftEyeX = segment.x + eyeOffset;
+                rightEyeX = segment.x + gridSize - eyeOffset - eyeSize;
+                leftEyeY = segment.y + eyeOffset;
+                rightEyeY = leftEyeY;
+            }
+            
+            const leftEye = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            leftEye.setAttribute("x", leftEyeX);
+            leftEye.setAttribute("y", leftEyeY);
+            leftEye.setAttribute("width", eyeSize);
+            leftEye.setAttribute("height", eyeSize);
+            leftEye.setAttribute("class", "snake-eye");
+            
+            const rightEye = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            rightEye.setAttribute("x", rightEyeX);
+            rightEye.setAttribute("y", rightEyeY);
+            rightEye.setAttribute("width", eyeSize);
+            rightEye.setAttribute("height", eyeSize);
+            rightEye.setAttribute("class", "snake-eye");
+            
+            eyesGroup.appendChild(leftEye);
+            eyesGroup.appendChild(rightEye);
+        }
+    });
+}
+
+function checkCollision(head) {
+    if (head.x < 0 || head.x >= boardWidth || head.y < 0 || head.y >= boardHeight) {
+        return true;
+    }
+    return snake.slice(1).some(segment => 
+        segment.x === head.x && segment.y === head.y
+    );
+}
+
+function getRandomDirection() {
+    const possibleDirections = [];
+    const head = snake[0];
+    
+    [{x: gridSize, y: 0}, {x: -gridSize, y: 0}, {x: 0, y: gridSize}, {x: 0, y: -gridSize}]
+        .forEach(dir => {
+            const newHead = {x: head.x + dir.x, y: head.y + dir.y};
+            if (!checkCollision(newHead)) {
+                possibleDirections.push(dir);
+            }
+        });
+    
+    if (possibleDirections.length === 0) {
+        return null;
+    }
+    
+    return possibleDirections[Math.floor(Math.random() * possibleDirections.length)];
+}
+
+function moveSnake() {
+    direction = nextDirection;
+    const head = snake[0];
+    const newHead = {
+        x: head.x + direction.x,
+        y: head.y + direction.y
+    };
+    
+    if (checkCollision(newHead)) {
+        snake = [
+            {x: 300, y: 200},
+            {x: 280, y: 200},
+            {x: 260, y: 200},
+            {x: 240, y: 200},
+            {x: 220, y: 200},
+            {x: 200, y: 200}
+        ];
+        direction = {x: gridSize, y: 0};
+        nextDirection = {x: gridSize, y: 0};
+    } else {
+        snake.unshift(newHead);
+        snake.pop();
+    }
+    
+    updateSnake();
+    
+    const newDirection = getRandomDirection();
+    if (newDirection) {
+        if (!(newDirection.x === -direction.x && newDirection.y === -direction.y)) {
+            nextDirection = newDirection;
+        }
+    }
+    
+    setTimeout(moveSnake, 200);
+}
+
+// Iniciar el juego
+updateSnake();
+moveSnake();
+</script>
+</body>
+</html>
